@@ -21,7 +21,7 @@ const privateNavLinks = [
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, logout, displayName } = useAuth();
+  const { user, profile, isAdmin, logout, displayName } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -60,6 +60,8 @@ export default function Navbar() {
     | { avatar_url?: string; full_name?: string; name?: string }
     | undefined;
 
+  // Prefer DB-stored avatar (always up to date), fall back to OAuth metadata
+  const avatarUrl = profile?.avatar_url || metadata?.avatar_url || null;
   const avatarLetter = (displayName || 'U').trim().charAt(0).toUpperCase();
 
   return (
@@ -136,11 +138,12 @@ export default function Navbar() {
                     }}
                     className="flex items-center gap-2 p-1 rounded-full border border-white/10 hover:bg-white/5 transition-colors"
                   >
-                    {metadata?.avatar_url ? (
+                    {avatarUrl ? (
                       <img 
-                        src={metadata.avatar_url} 
+                        src={avatarUrl} 
                         alt="Profile" 
-                        className="w-8 h-8 rounded-full border border-orange-500/50" 
+                        className="w-8 h-8 rounded-full border border-orange-500/50"
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500 font-semibold text-sm">

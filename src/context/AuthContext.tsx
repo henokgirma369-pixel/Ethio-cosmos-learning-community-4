@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, email, role, created_at, updated_at')
+        .select('id, username, email, avatar_url, role, created_at, updated_at')
         .eq('id', userId)
         .maybeSingle();
 
@@ -83,12 +83,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: nextUser.id,
           email: nextUser.email || '',
           username: metadata?.full_name || metadata?.name || (nextUser.email ? nextUser.email.split('@')[0] : 'User'),
+          avatar_url: (metadata?.avatar_url as string | undefined) || null,
           role: 'user', // Default to user until DB confirms
           created_at: nextUser.created_at,
           updated_at: new Date().toISOString(),
         };
         setProfile(optimisticProfile);
         
+        // If user signed in with Google, immediately update their avatar/name
+        // in the DB so it's always fresh. Use UPDATE only (not upsert) because
+        // RLS has no INSERT policy for clients — the trigger handles new inserts.
+        const avatarUrl = metadata?.avatar_url as string | undefined;
+        const fullName = metadata?.full_name as string | undefined || metadata?.name as string | undefined;
+        if (avatarUrl || fullName) {
+          supabase
+            .from('profiles')
+            .update({
+              avatar_url: avatarUrl || null,
+              username: fullName || (nextUser.email ? nextUser.email.split('@')[0] : 'User'),
+            })
+            .eq('id', nextUser.id)
+            .then(() => {/* silent - fetchProfile will read the updated row */});
+        }
+
         // Fetch real profile in background
         fetchProfile(nextUser.id);
       } else {
