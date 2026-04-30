@@ -12,7 +12,11 @@ interface ChatMessageRow {
   image_url: string | null;
   created_at: string;
   user_id: string;
-  profiles?: { username?: string | null; email?: string | null } | null;
+  profiles?: {
+    username?: string | null;
+    email?: string | null;
+    avatar_url?: string | null;
+  } | null;
 }
 
 function rowToMessage(row: ChatMessageRow): ChatMessage {
@@ -41,65 +45,75 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Initial load + realtime subscription. Runs once per mounted user session.
   useEffect(() => {
     if (!user) return;
+
+    let isMounted = true;
 
     const fetchMessages = async () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('chat_messages')
           .select(
-            `id, message_text, image_url, created_at, user_id, profiles ( username, email )`
+            `id, message_text, image_url, created_at, user_id, profiles ( username, email, avatar_url )`
           )
           .order('created_at', { ascending: true });
 
         if (fetchError) {
           console.error('Error loading messages:', fetchError);
-          setError('Failed to load messages. Please refresh.');
+          if (isMounted) setError('Failed to load messages. Please refresh.');
           return;
         }
 
-        if (data) {
+        if (data && isMounted) {
           setMessages((data as unknown as ChatMessageRow[]).map(rowToMessage));
         }
       } catch (err) {
         console.error('Unexpected error loading messages:', err);
-        setError('An unexpected error occurred.');
+        if (isMounted) setError('An unexpected error occurred.');
       }
     };
 
     fetchMessages();
 
+    // Real-time subscription: postgres_changes INSERT on chat_messages.
+    // Fetches the single new row joined with profiles (username, avatar_url, email)
+    // and appends it to local state. Deduplicates by id so the sender never
+    // sees their own message twice.
     const channel = supabase
-      .channel('messages-realtime')
+      .channel(`chat-messages-realtime-${user.id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         async (payload) => {
-          const m = payload.new as {
-            id: string;
-            user_id: string;
-            message_text: string | null;
-            image_url: string | null;
-            created_at: string;
-          };
+          const newRow = payload.new as { id: string };
+          if (!newRow?.id) return;
 
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('username, email')
-            .eq('id', m.user_id)
+          const { data: fullRow, error: rowError } = await supabase
+            .from('chat_messages')
+            .select(
+              `id, message_text, image_url, created_at, user_id, profiles ( username, email, avatar_url )`
+            )
+            .eq('id', newRow.id)
             .maybeSingle();
 
-          setMessages((prev) => [
-            ...prev,
-            rowToMessage({ ...m, profiles: profileData ?? null }),
-          ]);
+          if (rowError || !fullRow || !isMounted) return;
+
+          const message = rowToMessage(fullRow as unknown as ChatMessageRow);
+
+          setMessages((prev) => {
+            // Dedupe: don't append if this id is already in state.
+            if (prev.some((m) => m.id === message.id)) return prev;
+            return [...prev, message];
+          });
         }
       )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      isMounted = false;
+      supabase.removeChannel(channel);
     };
   }, [user]);
 
@@ -117,6 +131,8 @@ export default function ChatPage() {
     setNewMessage('');
     setError(null);
     try {
+      // Insert only — DO NOT reload messages. The realtime subscription
+      // above will receive the INSERT event and append the new message.
       const { error: insertError } = await supabase.from('chat_messages').insert({
         user_id: user.id,
         message_text: text,
@@ -147,6 +163,7 @@ export default function ChatPage() {
         data: { publicUrl },
       } = supabase.storage.from('uploads').getPublicUrl(filePath);
 
+      // Insert only — realtime subscription will append the message.
       const { error: insertError } = await supabase.from('chat_messages').insert({
         user_id: user.id,
         image_url: publicUrl,
