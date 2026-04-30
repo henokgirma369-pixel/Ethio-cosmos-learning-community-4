@@ -98,47 +98,6 @@ export function AboutPage() {
         </div>
       </section>
 
-      {/* Values Section */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-white mb-12 text-center">
-            Our Values
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center p-6">
-              <div className="text-4xl mb-4">📚</div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Education First
-              </h3>
-              <p className="text-gray-400">
-                We believe in making quality astronomy education accessible to everyone, regardless of background.
-              </p>
-            </div>
-
-            <div className="text-center p-6">
-              <div className="text-4xl mb-4">🤝</div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Community Driven
-              </h3>
-              <p className="text-gray-400">
-                Our platform thrives on the contributions and engagement of our passionate community.
-              </p>
-            </div>
-
-            <div className="text-center p-6">
-              <div className="text-4xl mb-4">🌍</div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Cultural Heritage
-              </h3>
-              <p className="text-gray-400">
-                We celebrate Ethiopia's rich astronomical history and integrate it into modern learning.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Team Section */}
       <section className="py-16 bg-slate-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
